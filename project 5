@@ -1,0 +1,79 @@
+from PIL import Image
+import tensorflow as tf
+import cv2
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+
+DATASET_PATH = 'dataset/'
+
+
+def predict_image(image_path):
+    if not os.path.exists(image_path):
+        print(f"Ошибка: Файл не найден по пути: {image_path}")
+
+    if not os.path.exists("image_classifier.h5"):
+        print("Ошибка: Модель не найдена. Сначала запустите 1.py для обучения модели.")
+        return
+
+    try:
+        img = Image.open(image_path)
+        img.verify()
+        img = Image.open(image_path)
+    except (OSError, IOError) as e:
+        print(f"Ошибка: Неверный формат изображения - {image_path}")
+        print(f"Детали: {e}")
+        return
+
+    # Загружаем модель
+    try:
+        model = tf.keras.models.load_model("image_classifier.h5")
+    except Exception as e:
+        print(f"Ошибка загрузки модели: {e}")
+        return
+
+    if not os.path.exists(DATASET_PATH):
+        print(f"Ошибка: Папка {DATASET_PATH} не существует!")
+        return
+
+    class_names = sorted(os.listdir(DATASET_PATH))
+    print(f"Доступные классы: {class_names}")
+
+    img_cv = cv2.imread(image_path)
+    if img_cv is None:
+        print(f"Ошибка: Не удалось прочитать изображение - {image_path}")
+        return
+    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+    img_resized = cv2.resize(img_cv, (128, 128))
+    img_normalized = img_resized / 255.0
+    img_batch = np.expand_dims(img_normalized, axis=0)
+
+    prediction = model.predict(img_batch, verbose=0)
+
+    print(f"Результат предсказания: {prediction}")
+
+
+    if len(prediction[0]) == 1:
+        confidence = prediction[0][0]
+        if confidence > 0.5:
+            predicted_class = class_names[1]
+            confidence = confidence
+        else:
+            predicted_class = class_names[0]
+            confidence = 1 - confidence
+    else:
+        predicted_idx = np.argmax(prediction[0])
+        confidence = prediction[0][predicted_idx]
+        predicted_class = class_names[predicted_idx]
+
+    print(f"Модель определила: {predicted_class}")
+    print(f"Уверенность: {confidence:.4f}")
+
+    plt.figure(figsize=(10, 8))
+    plt.imshow(img_cv)
+    plt.title(f"Результат: {predicted_class}\nУверенность: {confidence:.4f}", fontsize=14)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+predict_image("dog111.jpg")
